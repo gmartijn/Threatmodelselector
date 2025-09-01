@@ -70,7 +70,7 @@ It's like Tinder, but for security frameworks. 💘🔐
 ``` bash
 git clone https://github.com/gmartijn/Threatmodelselector.git
 cd Threatmodelselector
-pip install absolutely-nothing
+python tmhelper.py
 ```
 
 You already have Python. 🐍\
