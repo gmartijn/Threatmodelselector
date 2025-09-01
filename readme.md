@@ -68,8 +68,8 @@ It's like Tinder, but for security frameworks. 💘🔐
 ## Installation 📥
 
 ``` bash
-git clone git@somewhere-on-the-internet
-cd threat_model_selector
+git clone https://github.com/gmartijn/Threatmodelselector.git
+cd Threatmodelselector
 pip install absolutely-nothing
 ```
 
@@ -83,26 +83,26 @@ If not, your problems are bigger than this script. 🤨
 **Interactive:**
 
 ``` bash
-python threat_model_selector.py
+python tmhelper.py
 ```
 
 **Non-interactive** (for robots 🤖, CI/CD 🛠️, and people who hate small
 talk 🙈):
 
 ``` bash
-python threat_model_selector.py --q1 yes --q2 no --q3 yes --q4 no --q5 no --q6 yes --q9 yes
+python tmhelper.py --q1 yes --q2 no --q3 yes --q4 no --q5 no --q6 yes --q9 yes
 ```
 
 **JSON output:**
 
 ``` bash
-python threat_model_selector.py --json
+python tmhelper.py --json
 ```
 
 **Skip prompts (default unanswered to 'no'):**
 
 ``` bash
-python threat_model_selector.py --no-prompt
+python tmhelper.py --no-prompt
 ```
 
 ------------------------------------------------------------------------
