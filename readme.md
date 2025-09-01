@@ -1,57 +1,80 @@
 # Threat Model Selector 3000™ 🛡️✨
 
-> *"Because choosing the wrong threat model is only slightly less
-> embarrassing than turning up to a black-tie dinner in your pajamas."*
-> 🕴️😴
+> *"Because choosing the wrong threat model is only slightly less\
+> embarrassing than forgetting your SBOM at a supply-chain party."* 📦🥳
 
 ------------------------------------------------------------------------
 
 ## What is this? 🤔
 
-This is a Python script that asks you six deeply probing, soul-searching
-questions like:\
-- "Are you focusing mainly on system design & technical threats?" 🖥️🔧\
-- "Is privacy and personal data compliance a main concern?" 🔒🧑‍⚖️\
-- "Do you ever wake up at 3 a.m. screaming 'PASTA!' and then realize you
-were just hungry?" 🍝😱
+This is a Python script that asks you up to **12 questions** --- six
+core ones and six bonus ones --- about your system, your risks, and your
+deepest compliance nightmares:
 
-Based on your answers (which are mysteriously restricted to **yes** or
-**no** because nuance is for philosophers 🧘‍♂️), the script then
-recommends a threat modeling methodology.\
-It's like speed-dating 💘, but for frameworks 📊.
+-   "Are you focusing mainly on system design & technical threats?"
+    🖥️🔧\
+-   "Is privacy and personal data compliance a main concern?" 🔒🧑‍⚖️\
+-   "Do you ever shout 'PASTA!' and then realize you were just hungry?"
+    🍝😱\
+-   "Do you need regulator-ready artifacts?" 📑🧐\
+-   "Is your system safety-critical (like planes, cars, or your
+    toaster)?" ✈️🚗🍞\
+-   "Do you want to drag threat modeling into your CI/CD pipeline?" 🤖🔄
+
+Based on your answers (restricted to **yes** or **no** because nuance is
+for philosophers 🧘‍♂️), the script recommends one or more **threat
+modeling methodologies**.
+
+It's like Tinder, but for security frameworks. 💘🔐
 
 ------------------------------------------------------------------------
 
 ## How it works ⚙️
 
 1.  You run the script. ▶️\
-2.  It interrogates you like a mildly sarcastic customs officer. 🛂😏\
-3.  You reply with `yes` or `no` (or their cousins `y/n/true/false` if
-    you're feeling rebellious 😎).\
-4.  Out pops your destiny in the form of a threat model:
-    -   **STRIDE** if you like tidy diagrams and lists. 📝\
+2.  It interrogates you like a sarcastic security auditor. 🕵️‍♀️😏\
+3.  You reply with `yes` or `no` (or their rebellious cousins
+    `y/n/true/false/1/0`).\
+4.  Out comes your destiny:
+    -   **STRIDE** if you love tidy diagrams and enumerating threats.
+        📝\
     -   **LINDDUN** if GDPR haunts your dreams. 👻📜\
-    -   **PASTA** if you think in seven stages and secretly wish you
-        worked in a kitchen. 🍝👨‍🍳\
-    -   **OCTAVE/FAIR** if you prefer thinking in balance sheets. 📈💰\
-    -   **Attack Trees** if you doodle elaborate plots on napkins. 🌳🖊️\
-    -   **VAST** if you believe Agile can, in fact, be made more
-        complex. 🌀🐇\
-    -   Or, failing all else, the script shrugs and says *"combine stuff
-        and hope for the best."* 🤷‍♂️✨
+    -   **PASTA** if you enjoy attacker scenarios *and* carbs. 🍝👨‍🍳\
+    -   **OCTAVE/FAIR** if you think in spreadsheets and dollar signs.
+        📈💰\
+    -   **Attack Trees** if you plot evil flows on napkins. 🌳🖊️\
+    -   **VAST** if you want to scale security workshops across Agile
+        chaos. 🌀🐇\
+    -   **Fallback combo platter** if nothing fits: *"just mix and
+        hope"*. 🤷‍♂️✨\
+5.  Bonus answers refine the output: want quantification? supply chain
+    coverage? CI/CD integration? We've got add-ons for that. 🎁
+
+------------------------------------------------------------------------
+
+## Features ✨
+
+-   **Interactive mode** (like a choose-your-own-adventure book, but
+    scarier).\
+-   **Non-interactive flags** (for introverts and robots 🤖).\
+-   **JSON output** (because destiny should be machine-parsable 📦).\
+-   **Condensed recommendation** with a **Top Pick** and scoring
+    breakdown 🏆.\
+-   **Preference scoring model** documented in
+    [calculation.md](calculation.md). 🧮
 
 ------------------------------------------------------------------------
 
 ## Installation 📥
 
 ``` bash
-git clone you-must-be-joking
+git clone git@somewhere-on-the-internet
 cd threat_model_selector
 pip install absolutely-nothing
 ```
 
 You already have Python. 🐍\
-If not, what are you even doing here? 🤨
+If not, your problems are bigger than this script. 🤨
 
 ------------------------------------------------------------------------
 
@@ -63,18 +86,61 @@ If not, what are you even doing here? 🤨
 python threat_model_selector.py
 ```
 
-**Non-interactive** (for robots 🤖, introverts 🙈, and continuous
-integration pipelines 🛠️):
+**Non-interactive** (for robots 🤖, CI/CD 🛠️, and people who hate small
+talk 🙈):
 
 ``` bash
-python threat_model_selector.py --q1 yes --q2 no --q3 yes --q4 no --q5 no --q6 yes
+python threat_model_selector.py --q1 yes --q2 no --q3 yes --q4 no --q5 no --q6 yes --q9 yes
 ```
 
-**JSON output** (for people who prefer their destiny machine-parsable
-📦):
+**JSON output:**
 
 ``` bash
 python threat_model_selector.py --json
+```
+
+**Skip prompts (default unanswered to 'no'):**
+
+``` bash
+python threat_model_selector.py --no-prompt
+```
+
+------------------------------------------------------------------------
+
+## Example Output 📊
+
+Here's what you might see if you run the script interactively and answer
+`q1=yes`, `q9=yes`, `q10=yes`:
+
+``` text
+=== Full Recommendation ===
+- STRIDE: Use for system/DFD-centric design reviews to enumerate Spoofing, Tampering, Repudiation, Info Disclosure, DoS, EoP.
+- CI/CD-Integrated Threat Modeling (e.g., VAST, tool-supported STRIDE): Automate checks in pipelines; keep models living with architecture-as-code/microservices.
+
+Rationale:
+* Q1: If yes, STRIDE maps cleanly to data-flow diagrams and design reviews.
+* Q9: If yes, favor approaches and tooling that work well in DevSecOps pipelines.
+* Q10: If yes, include FAIR-style quantitative analysis.
+
+Answers:
+  Q1: yes
+  Q2: no
+  Q3: no
+  Q4: no
+  Q5: no
+  Q6: no
+  Q7: no
+  Q8: no
+  Q9: yes
+  Q10: yes
+  Q11: no
+  Q12: no
+
+=== Condensed Recommendation ===
+Top pick: STRIDE
+Also consider: none
+Refinements: CI/CD-Integrated Threat Modeling (e.g., VAST, tool-supported STRIDE)
+Scores: STRIDE=4
 ```
 
 ------------------------------------------------------------------------
@@ -82,14 +148,22 @@ python threat_model_selector.py --json
 ## Frequently Asked Questions ❓💡
 
 **Q: What if I answer all questions with "no"?**\
-A: Congratulations 🎉. You've just invented your own new methodology
-called *Procrastinate-Driven Development™*. 🛋️⏳
+A: Congratulations 🎉. You've just invented *Procrastinate-Driven
+Development™*. 🛋️⏳
 
-**Q: Can I extend the script to include my own exotic frameworks?**\
-A: Yes 🙌. Please do. Especially if it has a ridiculous acronym 🤪.
+**Q: What's this "condensed recommendation"?**\
+A: It's the TL;DR of threat modeling. You get a **Top Pick** (most
+preferred method), an *"also consider"* list, and refinements.
+Basically: "Just do this one, but maybe spice it up with these extras."
+🌶️
 
-**Q: Why does this README sound slightly unhinged?**\
-A: Because security is serious 🔐, but explanations don't have to be 😂.
+**Q: Can I add my own exotic frameworks?**\
+A: Yes 🙌. Especially if it has a ridiculous acronym like **CATS**
+(*Cyber Adversary Tree Simulation*). 🐱🌳
+
+**Q: Why does this README sound unhinged?**\
+A: Because security is serious 🔐, but documentation doesn't have to be
+😂.
 
 ------------------------------------------------------------------------
 
@@ -97,5 +171,5 @@ A: Because security is serious 🔐, but explanations don't have to be 😂.
 
 This software is released under the **Infinite Improbability License**.
 🌌\
-Basically, do what you like, but if something goes wrong, blame the
-Vogons. 👽📚
+Basically: do whatever you like, but if it goes wrong, blame the Vogons.
+👽📚
