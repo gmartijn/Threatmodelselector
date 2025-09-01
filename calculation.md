@@ -10,11 +10,13 @@ recommendations.
 
 Each **Level-1 "yes" answer** contributes a **base score**:
 
-\[ `\text{Score}`{=tex}(M) = `\text{Score}`{=tex}(M) + B \]
+$$
+Score(M) = Score(M) + B
+$$
 
 Where:\
-- ( M ) = method recommended by the question\
-- ( B = 3 ) (base score for each "yes")
+- $M$ = method recommended by the question\
+- $B = 3$ (base score for each "yes")
 
 ------------------------------------------------------------------------
 
@@ -23,10 +25,12 @@ Where:\
 Some Level-2 "yes" answers **boost specific methods**.\
 Each bonus is worth:
 
-\[ `\text{Score}`{=tex}(M) = `\text{Score}`{=tex}(M) + `\beta`{=tex} \]
+$$
+Score(M) = Score(M) + \beta
+$$
 
 Where:\
-- ( `\beta `{=tex}= 1 ) (bonus per relevant refinement)
+- $\beta = 1$ (bonus per relevant refinement)
 
 ### Bonus mapping:
 
@@ -47,8 +51,9 @@ Where:\
 
 If **no Level-1 questions** are answered "yes":
 
-\[ `\text{Recommendation}`{=tex} =
-{`\text{Reconsider scope / combine methods}`{=tex}} \]
+$$
+Recommendation = \{ Reconsider\ scope\ /\ combine\ methods \}
+$$
 
 This ensures the tool never returns an empty recommendation set.
 
@@ -58,8 +63,9 @@ This ensures the tool never returns an empty recommendation set.
 
 The **Top Pick** is chosen as:
 
-\[ `\text{Top Pick}`{=tex} = `\arg`{=tex}`\max`{=tex}\_{M
-`\in `{=tex}L1} `\text{Score}`{=tex}(M) \]
+$$
+TopPick = \arg\max_{M \in L1} Score(M)
+$$
 
 Where ties are broken by **first occurrence in question order** (Q1 →
 Q6).
@@ -71,9 +77,9 @@ Q6).
 All other methods with positive scores are listed in **descending
 order**:
 
-\[ `\text{Also Consider}`{=tex} = {M `\in `{=tex}L1
-`\setminus `{=tex}{`\text{Top Pick}`{=tex}} ;\|; `\text{Score}`{=tex}(M)
-\> 0} \]
+$$
+AlsoConsider = \{ M \in L1 \setminus \{TopPick\} \;|\; Score(M) > 0 \}
+$$
 
 ------------------------------------------------------------------------
 
