@@ -159,7 +159,7 @@ Basically: "Just do this one, but maybe spice it up with these extras."
 
 **Q: Can I add my own exotic frameworks?**\
 A: Yes 🙌. Especially if it has a ridiculous acronym like **CATS**
-(*Cyber Adversary Tree Simulation*). 🐱🌳
+(*Cyber Adversary Tree Simulation*).  🐱🌳 (*Criteria stored in a seperate file is something on the roadmap*)
 
 **Q: Why does this README sound unhinged?**\
 A: Because security is serious 🔐, but documentation doesn't have to be
