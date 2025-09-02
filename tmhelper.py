@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Threat Model Selector (Two-Level + Condensed Recommendation)
-Asks up to 12 questions:
-- Level 1 (Q1–Q6): Core method fit
-- Level 2 (Q7–Q12): Refinements for context/constraints/outcomes
+Threat Model Selector (Two-Level + Level-3 Refiners + Output/UX Upgrades)
+
+Adds Level 3 method-specific refiners and nicer output controls.
+
+Asks up to 12 questions for L1/L2 and optional L3 blocks gated by L1 picks.
 Outputs:
 - Full recommendation list with details and rationale
-- Condensed summary and "Top pick" (preference) based on input-driven scoring
+- Condensed summary and "Top pick" based on input-driven scoring
+- JSON/Markdown/Text formats with a stable schema version
 
 Usage:
   Interactive (default when stdin is a TTY and --no-prompt is not set):
@@ -18,15 +20,25 @@ Usage:
       --q7 yes --q8 no --q9 yes --q10 yes --q11 yes --q12 no
 
   JSON output:
-    python threat_model_selector.py --json
+    python threat_model_selector.py --format json
+
+  Markdown output (great for wikis/PRs):
+    python threat_model_selector.py --format markdown
 
   Skip prompts (useful in CI; unanswered default to "no"):
     python threat_model_selector.py --no-prompt
 
+  Only condensed:
+    python threat_model_selector.py --only-condensed
+
+  Provide answers from file (JSON or YAML):
+    python threat_model_selector.py --answers answers.json
+
 Notes:
 - CLI answers accept: y/n/yes/no/true/false/1/0 (case-insensitive).
 - Level 1 picks the main modeling approaches; Level 2 adds focused refinements.
-- "Top pick" is chosen from Level 1 selections (or fallback), with Level 2 providing tie-break boosts.
+- Level 3 refines ambiguous Level-1 bundles (e.g., OCTAVE vs FAIR; VAST vs Security Cards).
+- "Top pick" is chosen from Level 1 selections; Level 2 provides tie-break boosts; Level 3 resolves names.
 """
 
 import argparse
@@ -115,12 +127,146 @@ DETAILS: Dict[str, str] = {
     "CI/CD-Integrated Threat Modeling (e.g., VAST, tool-supported STRIDE)": "Automate checks in pipelines; keep models living with architecture-as-code/microservices.",
     "FAIR (Quantitative Add-on)": "Augment with loss magnitude/frequency estimates to support budgeting and risk acceptance.",
     "MITRE ATT&CK + CAPEC Integration": "Map threats and mitigations to adversary TTPs and attack patterns; improve realism and detection alignment.",
-    "Supply-Chain Modeling (SBOM-centric)": "Model dependency risk, update cadence, provenance, and exposure through SBOM-driven analysis."
+    "Supply-Chain Modeling (SBOM-centric)": "Model dependency risk, update cadence, provenance, and exposure through SBOM-driven analysis.",
+    # Resolved L3 specifics
+    "FAIR": "Financially quantitative risk analysis using loss magnitude/frequency modeling.",
+    "OCTAVE": "Organization-centric, qualitative risk posture and process-focused analysis.",
+    "VAST": "Scalable threat modeling aligned to Agile/DevOps with automation potential.",
+    "Security Cards": "Workshop method to spark creative attacker-motive-driven ideation.",
+    "STRIDE-per-DFD": "Apply STRIDE to data flows/processes/stores across trust boundaries for systematic design coverage.",
+    "STRIDE-per-Element": "Apply STRIDE to each component/service when DFDs are impractical or the system is service-oriented.",
+    "PASTA (full)": "Follow all seven stages with end-to-end traceability from business objectives to test cases and mitigations.",
+    "PASTA (light)": "Lightweight, scenario-driven adaptation of PASTA for time-boxed projects while preserving attacker realism.",
+    "LINDDUN (DPIA-oriented)": "Use LINDDUN to drive a DPIA-style artifact with explicit mapping to regulatory obligations.",
+    "LINDDUN (engineering-oriented)": "Focus LINDDUN outputs on design decisions (minimization, unlinkability, consent patterns) over paperwork.",
+    "ATT&CK-led mapping": "Drive analysis from adversary TTPs to detections/controls; great for blue teams and purple teaming.",
+    "Attack-Tree-led": "Start from attacker goals and decompose paths for design and abuse-case reviews; great for architects.",
+    "CAPEC-led cataloging": "Organize by attack pattern classes to create reusable requirements/test catalogs across products."
 }
+
+# -------------------------
+# Level 3: Method-specific refiners
+# -------------------------
+# Only asked if the corresponding Level-1 method is selected.
+# Keys must match Level-1 method labels.
+L3_BLOCKS: Dict[str, List[Question]] = {
+    "OCTAVE or FAIR": [
+        ("l3_octavefair_quant", "Do you need defensible financial quantification for board/budget decisions?",
+         "If yes, prefer FAIR for quantitative risk modeling."),
+        ("l3_octavefair_orgwide", "Is org-wide process/culture and qualitative posture your main focus?",
+         "If yes, prefer OCTAVE for organization-centric risk posture."),
+    ],
+    "VAST or Security Cards": [
+        ("l3_vastcards_scale", "Do you need to scale modeling across many Agile/DevOps teams or integrate with pipelines?",
+         "If yes, VAST fits scalable, automatable workflows."),
+        ("l3_vastcards_ideation", "Do you want creative, workshop-style ideation to explore attacker motives?",
+         "If yes, Security Cards boost group ideation."),
+    ],
+    "STRIDE": [
+        ("l3_stride_dfd", "Will you model data flows with DFDs (trust boundaries, stores, processes)?",
+         "If yes, prefer STRIDE-per-DFD for systematic coverage."),
+        ("l3_stride_element", "Is your architecture better captured as components/services without DFDs?",
+         "If yes, prefer STRIDE-per-Element for inventory-driven analysis."),
+    ],
+    "PASTA": [
+        ("l3_pasta_full", "Do you need full 7-stage traceability from business objectives to test cases?",
+         "If yes, prefer PASTA (full)."),
+        ("l3_pasta_light", "Do you want a lighter, scenario-driven variant due to time constraints?",
+         "If yes, prefer PASTA (light)."),
+    ],
+    "LINDDUN": [
+        ("l3_linddun_dpia", "Is your primary outcome a DPIA/compliance artifact (e.g., GDPR Article 35)?",
+         "If yes, emphasize LINDDUN (DPIA-oriented)."),
+        ("l3_linddun_engineering", "Do you focus on privacy engineering decisions (data minimization, unlinkability) over paperwork?",
+         "If yes, emphasize LINDDUN (engineering-oriented)."),
+    ],
+    "Attack Trees + MITRE ATT&CK + CAPEC": [
+        ("l3_amc_detection", "Are the main consumers detection/blue teams wanting TTP coverage and detections?",
+         "If yes, prefer ATT&CK-led mapping."),
+        ("l3_amc_design", "Are the main consumers architecture/design teams needing scenario trees for abuse cases?",
+         "If yes, prefer Attack-Tree-led."),
+        ("l3_amc_catalog", "Do you need structured pattern coverage for classes of attacks (for requirements/testing catalogs)?",
+         "If yes, prefer CAPEC-led cataloging."),
+    ],
+}
+
+# Map ambiguous Level-1 labels to display-specific picks based on L3 answers.
+def resolve_l3(method: str, answers: Dict[str, str]) -> str:
+    if method == "OCTAVE or FAIR":
+        q_quant = answers.get("l3_octavefair_quant") == "yes"
+        q_org = answers.get("l3_octavefair_orgwide") == "yes"
+        if q_quant and not q_org:
+            return "FAIR"
+        if q_org and not q_quant:
+            return "OCTAVE"
+        if q_quant and q_org:
+            return "FAIR"  # prefer FAIR when both are true
+        return method
+    if method == "VAST or Security Cards":
+        q_scale = answers.get("l3_vastcards_scale") == "yes"
+        q_ideate = answers.get("l3_vastcards_ideation") == "yes"
+        if q_scale and not q_ideate:
+            return "VAST"
+        if q_ideate and not q_scale:
+            return "Security Cards"
+        if q_scale and q_ideate:
+            return "VAST"  # prefer VAST for operational scale
+        return method
+    if method == "STRIDE":
+        q_dfd = answers.get("l3_stride_dfd") == "yes"
+        q_elem = answers.get("l3_stride_element") == "yes"
+        if q_dfd and not q_elem:
+            return "STRIDE-per-DFD"
+        if q_elem and not q_dfd:
+            return "STRIDE-per-Element"
+        if q_dfd and q_elem:
+            return "STRIDE-per-DFD"  # default to DFD if both
+        return method
+    if method == "PASTA":
+        q_full = answers.get("l3_pasta_full") == "yes"
+        q_light = answers.get("l3_pasta_light") == "yes"
+        if q_full and not q_light:
+            return "PASTA (full)"
+        if q_light and not q_full:
+            return "PASTA (light)"
+        if q_full and q_light:
+            return "PASTA (full)"  # prefer full when both
+        return method
+    if method == "LINDDUN":
+        q_dpia = answers.get("l3_linddun_dpia") == "yes"
+        q_eng = answers.get("l3_linddun_engineering") == "yes"
+        if q_dpia and not q_eng:
+            return "LINDDUN (DPIA-oriented)"
+        if q_eng and not q_dpia:
+            return "LINDDUN (engineering-oriented)"
+        if q_dpia and q_eng:
+            return "LINDDUN (DPIA-oriented)"  # bias to compliance when both
+        return method
+    if method == "Attack Trees + MITRE ATT&CK + CAPEC":
+        q_det = answers.get("l3_amc_detection") == "yes"
+        q_des = answers.get("l3_amc_design") == "yes"
+        q_cat = answers.get("l3_amc_catalog") == "yes"
+        # Priority: detection > design > catalog (can tweak)
+        if q_det and not (q_des or q_cat):
+            return "ATT&CK-led mapping"
+        if q_des and not (q_det or q_cat):
+            return "Attack-Tree-led"
+        if q_cat and not (q_det or q_des):
+            return "CAPEC-led cataloging"
+        # Mixed: prefer ATT&CK-led if detection is among goals
+        if q_det:
+            return "ATT&CK-led mapping"
+        if q_des:
+            return "Attack-Tree-led"
+        if q_cat:
+            return "CAPEC-led cataloging"
+        return method
+    return method
 
 # -------------------------
 # Input handling utilities
 # -------------------------
+
 def normalize_answer(s: str) -> str:
     s = s.strip().lower()
     if s in {"y", "yes", "true", "t", "1"}:
@@ -148,6 +294,7 @@ def _cli_choice(s: str) -> str:
 # -------------------------
 # Decision engine (L1 + L2)
 # -------------------------
+
 def decide(answers: Dict[str, str]) -> Dict[str, Any]:
     """
     Returns:
@@ -185,7 +332,6 @@ def decide(answers: Dict[str, str]) -> Dict[str, Any]:
 
     # Merge full list (L1 first, then refinements)
     recommendations = chosen + [r for r in refinements_selected if r not in chosen]
-    details = [DETAILS.get(c, "") for c in recommendations]
 
     # Compute preference scores to select a top pick among Level 1 selections
     scores = _compute_preference_scores(answers, chosen)
@@ -195,6 +341,9 @@ def decide(answers: Dict[str, str]) -> Dict[str, Any]:
 
     # Also consider: other L1 picks (excluding top) in score order
     also_consider = [m for m in _sorted_by_score(scores) if m != top_pick]
+
+    # Initial details based on pre-resolution names
+    details = [DETAILS.get(c, "") for c in recommendations]
 
     return {
         "answers": answers,
@@ -209,6 +358,7 @@ def decide(answers: Dict[str, str]) -> Dict[str, Any]:
 # -------------------------
 # Preference scoring
 # -------------------------
+
 def _compute_preference_scores(answers: Dict[str, str], l1_selected: List[str]) -> Dict[str, int]:
     """
     Score only Level-1 (primary) methods. Base points for each 'yes' pick,
@@ -231,34 +381,33 @@ def _compute_preference_scores(answers: Dict[str, str], l1_selected: List[str]) 
     if "STRIDE" in scores:
         if answers.get("q9") == "yes":  # CI/CD + cloud
             scores["STRIDE"] += BONUS
-        if answers.get("q7") == "yes":  # compliance docs sometimes needed in STRIDE reviews
-            scores["STRIDE"] += 0  # leave neutral unless you want to influence
+        if answers.get("q7") == "yes":
+            scores["STRIDE"] += 0  # neutral but kept for readability
 
     if "LINDDUN" in scores:
-        if answers.get("q7") == "yes":  # compliance / privacy by design
+        if answers.get("q7") == "yes":
             scores["LINDDUN"] += BONUS
 
     if "PASTA" in scores:
-        if answers.get("q11") == "yes":  # TTP / intel mapping
+        if answers.get("q11") == "yes":
             scores["PASTA"] += BONUS
-        if answers.get("q10") == "yes":  # quantitative appetite
-            scores["PASTA"] += BONUS  # risk-driven method often pairs well with quant
+        if answers.get("q10") == "yes":
+            scores["PASTA"] += BONUS
 
     if "OCTAVE or FAIR" in scores:
-        if answers.get("q10") == "yes":  # quantitative for board/budget
+        if answers.get("q10") == "yes":
             scores["OCTAVE or FAIR"] += BONUS
-        if answers.get("q7") == "yes":  # compliance artifacts
+        if answers.get("q7") == "yes":
             scores["OCTAVE or FAIR"] += BONUS
 
     if "Attack Trees + MITRE ATT&CK + CAPEC" in scores:
-        if answers.get("q11") == "yes":  # TTP integration
+        if answers.get("q11") == "yes":
             scores["Attack Trees + MITRE ATT&CK + CAPEC"] += BONUS
 
     if "VAST or Security Cards" in scores:
-        if answers.get("q9") == "yes":  # CI/CD / scale
+        if answers.get("q9") == "yes":
             scores["VAST or Security Cards"] += BONUS
 
-    # Fallback stays with its base only if it's the only one
     return {k: int(v) for k, v in scores.items()}
 
 
@@ -270,15 +419,15 @@ def _sorted_by_score(scores: Dict[str, int]) -> List[str]:
 
 def _select_top_pick(scores: Dict[str, int], l1_selected: List[str]) -> str:
     if not scores:
-        # When only fallback exists or no L1 picks, return fallback (if present), else ""
         return "Reconsider scope / combine methods" if "Reconsider scope / combine methods" in l1_selected else (l1_selected[0] if l1_selected else "")
     return _sorted_by_score(scores)[0]
 
 # -------------------------
 # CLI
 # -------------------------
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Threat Model Selector (Two-Level + Condensed Recommendation)")
+    parser = argparse.ArgumentParser(description="Threat Model Selector (Two-Level + Condensed Recommendation + L3 Refiners)")
     # Level 1 flags
     for qid, text, _ in QUESTIONS_L1:
         parser.add_argument(f"--{qid}", type=_cli_choice, help=text + " (yes/no)")
@@ -286,7 +435,27 @@ def main() -> None:
     for qid, text, _ in QUESTIONS_L2:
         parser.add_argument(f"--{qid}", type=_cli_choice, help=text + " (yes/no)")
 
-    parser.add_argument("--json", action="store_true", help="Output result as JSON")
+    # Level 3 flags (namespaced by explicit IDs; shown/used only if relevant)
+    for method, block in L3_BLOCKS.items():
+        for qid, text, _ in block:
+            parser.add_argument(f"--{qid}", type=_cli_choice, help=f"[{method}] {text} (yes/no)")
+
+    parser.add_argument(
+        "--format",
+        choices=["text", "markdown", "json"],
+        default="text",
+        help="Output format (text, markdown, json)."
+    )
+    parser.add_argument(
+        "--only-condensed",
+        action="store_true",
+        help="Only print the condensed recommendation (top pick + also consider)."
+    )
+    parser.add_argument(
+        "--answers",
+        type=str,
+        help="Path to JSON or YAML file containing q1..q12 and optional L3 answers."
+    )
     parser.add_argument(
         "--no-prompt",
         action="store_true",
@@ -298,14 +467,49 @@ def main() -> None:
     answers: Dict[str, str] = {}
     interactive_ok = sys.stdin.isatty() and not args.no_prompt
 
-    # Gather answers (CLI flags override interactive prompts)
+    # Load answers file (if provided)
+    if args.answers:
+        from pathlib import Path as _Path
+        p = _Path(args.answers)
+        if not p.exists():
+            print(f"Error: answers file not found: {p}", file=sys.stderr)
+            sys.exit(2)
+        text = p.read_text(encoding="utf-8")
+        data: Dict[str, Any]
+        try:
+            data = json.loads(text)
+        except Exception:
+            try:
+                import yaml as _yaml  # type: ignore
+                data = _yaml.safe_load(text)  # type: ignore
+            except Exception:
+                print("Error: failed to parse answers file as JSON or YAML.", file=sys.stderr)
+                sys.exit(2)
+        if not isinstance(data, dict):
+            print("Error: answers file must contain an object with q1..q12 keys.", file=sys.stderr)
+            sys.exit(2)
+        for qid, _t, _w in QUESTIONS_L1 + QUESTIONS_L2:
+            v = data.get(qid)
+            if isinstance(v, str):
+                nv = normalize_answer(v)
+                if nv in {"yes", "no"}:
+                    answers[qid] = nv
+        # Optional L3 keys from file
+        for method, block in L3_BLOCKS.items():
+            for qid, _t, _w in block:
+                v = data.get(qid)
+                if isinstance(v, str):
+                    nv = normalize_answer(v)
+                    if nv in {"yes", "no"}:
+                        answers[qid] = nv
+
     # Level 1 first
     for qid, text, _ in QUESTIONS_L1:
         val = getattr(args, qid)
         if val in {"yes", "no"}:
             answers[qid] = val
         else:
-            answers[qid] = ask_interactive(text) if interactive_ok else "no"
+            answers[qid] = ask_interactive(text) if interactive_ok else answers.get(qid, "no")
 
     # Level 2 next
     for qid, text, _ in QUESTIONS_L2:
@@ -313,44 +517,128 @@ def main() -> None:
         if val in {"yes", "no"}:
             answers[qid] = val
         else:
-            answers[qid] = ask_interactive(text) if interactive_ok else "no"
+            answers[qid] = ask_interactive(text) if interactive_ok else answers.get(qid, "no")
+
+    # Level 3: only prompt for methods selected in Level 1
+    provisional_l1 = []
+    for (qid, _text, _why) in QUESTIONS_L1:
+        if answers.get(qid) == "yes":
+            rec = RECOMMENDATIONS_L1[qid]["yes"]
+            if rec not in provisional_l1:
+                provisional_l1.append(rec)
+
+    for method in provisional_l1:
+        block = L3_BLOCKS.get(method, [])
+        for qid, text, _ in block:
+            val = getattr(args, qid, None)
+            if val in {"yes", "no"}:
+                answers[qid] = val
+            else:
+                answers[qid] = ask_interactive(f"[{method}] {text}") if interactive_ok else answers.get(qid, "no")
 
     result = decide(answers)
 
-    if args.json:
-        print(json.dumps(result, indent=2))
+    # Post-process: resolve ambiguous L1 labels for display (recommendations/top pick/also_consider)
+    def _resolved_name(name: str) -> str:
+        return resolve_l3(name, result["answers"])
+
+    result["recommendations"] = [_resolved_name(r) for r in result["recommendations"]]
+    result["top_pick"] = _resolved_name(result["top_pick"])
+    result["also_consider"] = [_resolved_name(a) for a in result["also_consider"]]
+
+    # Recompute details after L3 resolution to keep JSON consistent
+    result["details"] = [DETAILS.get(r, "") for r in result["recommendations"]]
+
+    # Add a schema version
+    result_out = dict(result)
+    result_out["schema_version"] = "1.0"
+
+    # ---------- Output helpers ----------
+    def _print_text(res: Dict[str, Any]) -> None:
+        if args.only_condensed:
+            print("=== Condensed Recommendation ===")
+            tp = res["top_pick"] or "N/A"
+            print(f"Top pick: {tp}")
+            if res["also_consider"]:
+                print("Also consider: " + ", ".join(res["also_consider"]))
+            if tp == "Reconsider scope / combine methods" and not [k for k, v in res["preference_scores"].items() if v > 0]:
+                print("(No strong Level-1 fit; consider refining scope or combining methods.)")
+            return
+
+        refinements = [r for r in res["recommendations"] if r not in PRIMARY_METHODS]
+        if refinements:
+            print("Refinements: " + ", ".join(refinements))
+
+        if res["preference_scores"]:
+            pairs = [f"{m}={res['preference_scores'][m]}" for m in _sorted_by_score(res["preference_scores"]) ]
+            print("Scores: " + ", ".join(pairs))
+
+        print("\n=== Full Recommendation ===")
+        for rec, detail in zip(res["recommendations"], res["details"]):
+            print(f"- {rec}: {detail}")
+
+        print("\nRationale:")
+        for r in res["rationale"]:
+            print(f"* {r}")
+
+        print("\nAnswers:")
+        for qid, _text, _why in QUESTIONS_L1 + QUESTIONS_L2:
+            print(f"  {qid.upper()}: {res['answers'][qid]}")
+        # Show L3 answers that were asked or provided
+        asked_l3 = [qid for block in L3_BLOCKS.values() for (qid, _t, _w) in block]
+        any_l3 = any(qid in res["answers"] for qid in asked_l3)
+        if any_l3:
+            print("  -- L3 refiners --")
+            for method, block in L3_BLOCKS.items():
+                for qid, text, _w in block:
+                    if qid in res["answers"]:
+                        print(f"  {qid}: {res['answers'][qid]}")
+
+        print("\n=== Condensed Recommendation ===")
+        print(f"Top pick: {res['top_pick'] or 'N/A'}")
+        if res["also_consider"]:
+            print("Also consider: " + ", ".join(res["also_consider"]))
+        if res["top_pick"] == "Reconsider scope / combine methods" and not [k for k, v in res["preference_scores"].items() if v > 0]:
+            print("(No strong Level-1 fit; consider refining scope or combining methods.)")
+
+    def _print_markdown(res: Dict[str, Any]) -> None:
+        print("# Threat Model Selector Results\n")
+        print("## Condensed Recommendation")
+        print(f"- **Top pick:** {res['top_pick'] or 'N/A'}")
+        if res["also_consider"]:
+            print(f"- **Also consider:** {', '.join(res['also_consider'])}")
+        if res["top_pick"] == "Reconsider scope / combine methods" and not [k for k, v in res["preference_scores"].items() if v > 0]:
+            print("  - _No strong Level-1 fit; consider refining scope or combining methods._")
+        if res["preference_scores"]:
+            ordered = _sorted_by_score(res["preference_scores"]) 
+            line = ", ".join([f"{m}={res['preference_scores'][m]}" for m in ordered])
+            print(f"\n**Scores:** {line}\n")
+        print("## Full Recommendation")
+        for rec, detail in zip(res["recommendations"], res["details"]):
+            print(f"- **{rec}** — {detail}")
+        print("\n## Rationale")
+        for r in res["rationale"]:
+            print(f"- {r}")
+        print("\n## Answers")
+        for qid, text, _why in QUESTIONS_L1 + QUESTIONS_L2:
+            print(f"- **{qid.upper()}** ({text}): {res['answers'][qid]}")
+        asked_l3 = [qid for block in L3_BLOCKS.values() for (qid, _t, _w) in block]
+        any_l3 = any(qid in res["answers"] for qid in asked_l3)
+        if any_l3:
+            print("\n## Level-3 Refiners")
+            for method, block in L3_BLOCKS.items():
+                for qid, text, _w in block:
+                    if qid in res["answers"]:
+                        print(f"- **{qid}** ({text}): {res['answers'][qid]}")
+
+    if args.format == "json":
+        print(json.dumps(result_out, indent=2))
         return
+    elif args.format == "markdown":
+        _print_markdown(result_out)
+    else:
+        _print_text(result_out)
 
-    # Brief refinements line (if any)
-    refinements = [r for r in result["recommendations"] if r not in PRIMARY_METHODS]
-    if refinements:
-        print("Refinements: " + ", ".join(refinements))
-
-    # Preference scores (for transparency)
-    if result["preference_scores"]:
-        pairs = [f"{m}={result['preference_scores'][m]}" for m in _sorted_by_score(result["preference_scores"])]
-        print("Scores: " + ", ".join(pairs))
-
-    # ---------- Full output ----------
-    print("\n=== Full Recommendation ===")
-    for rec, detail in zip(result["recommendations"], result["details"]):
-        print(f"- {rec}: {detail}")
-
-    print("\nRationale:")
-    for r in result["rationale"]:
-        print(f"* {r}")
-
-    print("\nAnswers:")
-    # Preserve order: L1 then L2
-    for qid, _text, _why in QUESTIONS_L1 + QUESTIONS_L2:
-        print(f"  {qid.upper()}: {result['answers'][qid]}")
-
-    # ---------- Condensed summary ----------
-    print("\n=== Condensed Recommendation ===")
-    print(f"Top pick: {result['top_pick'] or 'N/A'}")
-
-    if result["also_consider"]:
-        print("Also consider: " + ", ".join(result["also_consider"]))
 
 if __name__ == "__main__":
     try:
