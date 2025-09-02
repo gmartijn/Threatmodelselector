@@ -1,55 +1,59 @@
 # Threat Model Selector 3000™ 🛡️✨
 
-> *"Because choosing the wrong threat model is only slightly less embarrassing than forgetting your SBOM at a supply‑chain party."* 📦🥳
+> *"Because picking the wrong threat model is only slightly less embarrassing than forgetting your SBOM at a supply‑chain party."* 📦🥳  
+> Bonus: now with Level‑3 questions so you can win arguments faster and with charts. 📈
 
 ---
 
 ## What is this? 🤔
 
-A single Python CLI that interviews you (politely-ish) about your system, risk appetite, and constraints, then recommends **threat modeling methods** that fit — now with **Level‑3 refiners** that pick the *specific* variant when bundles are suggested (e.g., **OCTAVE _or_ FAIR** → **FAIR**).
+`tmhelper.py` is a tiny Python CLI that interviews you (politely‑ish) about your system, risk appetite, and constraints, then recommends **threat modeling methods** that fit.  
+It asks **Level‑1** (core fit) and **Level‑2** (refinements) questions — and, when relevant, **Level‑3** questions that resolve bundles into a *specific* choice (e.g., **OCTAVE or FAIR** → **FAIR**).
 
-It asks up to **12 core/refinement questions** (Level 1 + Level 2) and, when relevant, **method‑specific Level‑3 questions**. Answers are **yes/no** (also `y/n/true/false/1/0`).
-
-It’s like Tinder, but for security frameworks. 💘🔐
+It’s like Tinder, but for security frameworks. 💘🔐  
+Except the dates are compliance audits, and the ghosting is… your logging pipeline. 👻📜
 
 ---
 
 ## What’s new ✨
 
-- **Level‑3 method refiners** (only asked when relevant):
-  - **OCTAVE or FAIR** → resolves to **FAIR** or **OCTAVE**
-  - **VAST or Security Cards** → resolves to **VAST** or **Security Cards**
-  - **STRIDE** → **STRIDE‑per‑DFD** or **STRIDE‑per‑Element**
-  - **PASTA** → **PASTA (full)** or **PASTA (light)**
+- **Level‑3 method refiners** (asked *only* when relevant):
+  - **OCTAVE or FAIR** → **FAIR** or **OCTAVE** (spreadsheets vs workshops)
+  - **VAST or Security Cards** → **VAST** or **Security Cards** (scale vs vibes)
+  - **STRIDE** → **STRIDE‑per‑DFD** or **STRIDE‑per‑Element** (boxes vs inventories)
+  - **PASTA** → **PASTA (full)** or **PASTA (light)** (tasting menu vs express lunch)
   - **Attack Trees + MITRE ATT&CK + CAPEC** → **ATT&CK‑led**, **Attack‑Tree‑led**, or **CAPEC‑led**
   - **LINDDUN** → **LINDDUN (DPIA‑oriented)** or **LINDDUN (engineering‑oriented)**
-- **Nicer output controls**:
-  - `--format text|markdown|json`
-  - `--only-condensed` (just Top pick + Also consider)
-  - `--answers FILE` (JSON or YAML; handy for CI and reproducibility)
-  - Still supports `--no-prompt` for non‑interactive runs
-- **Stable JSON** includes `schema_version: "1.0"`
+- **Output/UX upgrades**:
+  - `--format text|markdown|json` (pick your poison)
+  - `--only-condensed` (the TL;DR your PM will actually read)
+  - `--answers FILE` (JSON/YAML — because answering the same questions 47 times is a prank, not a process)
+  - `--no-prompt` (great for CI and introverts)
+- **Stable JSON** includes `schema_version: "1.0"` (future‑you says thanks)
 
 ---
 
 ## How it works ⚙️
 
-1. **Level 1** (Q1–Q6): chooses main approaches (STRIDE, LINDDUN, PASTA, OCTAVE/FAIR, ATT&CK/Attack Trees/CAPEC, VAST/Security Cards; fallback suggests mixing/reshaping scope).
-2. **Level 2** (Q7–Q12): adds context refinements (compliance, safety, CI/CD, quant, TTPs, supply chain).
-3. **Level 3**: only for the methods you picked in Level 1; resolves bundles or variants (e.g., STRIDE flavor, VAST vs Cards).
-4. **Scoring**: Level‑1 answers set the base; Level‑2 adds small tie‑break bonuses. Level‑3 doesn’t change scores — it **renames** the chosen methods to the specific pick.
+1. **Level 1 (Q1–Q6):** choose main approaches — STRIDE, LINDDUN, PASTA, OCTAVE/FAIR, Attack Trees + ATT&CK + CAPEC, VAST/Security Cards.  
+   *If nothing fits, the tool suggests refining scope or combining methods (aka the buffet option).* 🍽️
+2. **Level 2 (Q7–Q12):** add context refinements — compliance, safety, CI/CD, quant, TTPs, supply chain.  
+   *Optional toppings. Like jalapeños, but for auditors.* 🌶️
+3. **Level 3 (method‑specific):** only for Level‑1 picks; resolves bundles/variants (e.g., VAST vs Security Cards).  
+   *Now we pick the exact sauce.* 🍝
+4. **Scoring:** Level‑1 answers set the base; Level‑2 adds small tie‑break bonuses. Level‑3 doesn’t change scores — it **renames** picks to the specific variant.  
+   *No secret ELO. Just honest math.*
 
 ---
 
 ## Installation 📥
 
 ```bash
-git clone https://github.com/<you>/<repo>.git
-cd <repo>
-# It’s just Python 3.
+git clone https://github.com/gmartijn/Threatmodelselector.git
+cd Threatmodelselector
+python tmhelper.py --help
 ```
-
-> If your file is named differently, adjust commands below. In this README we assume: `threat_model_selector.py`.
+> If `python` opens a text editor on your machine… we have questions. And a lot of empathy.
 
 ---
 
@@ -57,72 +61,77 @@ cd <repo>
 
 ### Interactive
 ```bash
-python threat_model_selector.py
+python tmhelper.py
 ```
 
 ### Non‑interactive (flags)
 ```bash
-python threat_model_selector.py   --q1 yes --q2 no --q3 yes --q4 yes --q5 no --q6 yes   --q7 yes --q9 yes --q10 yes --q11 yes --q12 no   --l3_octavefair_quant yes --l3_vastcards_scale yes
+python tmhelper.py   --q1 yes --q2 no --q3 yes --q4 yes --q5 no --q6 yes   --q7 yes --q9 yes --q10 yes --q11 yes --q12 no   --l3_octavefair_quant yes --l3_vastcards_scale yes
 ```
+*For bash completion, just hit ↑ until destiny appears.*
 
 ### Only the TL;DR
 ```bash
-python threat_model_selector.py --only-condensed
+python tmhelper.py --only-condensed
 ```
+*Great for steering committees and attention spans.*
 
 ### Output formats
 ```bash
 # Markdown (great for PRs/wikis)
-python threat_model_selector.py --format markdown
+python tmhelper.py --format markdown
 
 # JSON (machine‑readable)
-python threat_model_selector.py --format json
+python tmhelper.py --format json
 ```
+*Text is the default, because tradition.*
 
 ### Bring your own answers (JSON/YAML)
 ```bash
-python threat_model_selector.py --answers answers.json --format json
+python tmhelper.py --answers answers.json --format json
 ```
 **answers.json**
 ```json
 {
   "q1": "yes", "q3": "yes", "q4": "yes", "q6": "yes",
   "q9": "yes", "q10": "yes", "q11": "yes",
-  "l3_octavefair_quant": "yes",         
-  "l3_vastcards_scale": "yes",          
-  "l3_stride_dfd": "yes",               
-  "l3_pasta_light": "yes"               
+  "l3_octavefair_quant": "yes",
+  "l3_vastcards_scale": "yes",
+  "l3_stride_dfd": "yes",
+  "l3_pasta_light": "yes"
 }
 ```
+*Now your CI can have opinions, too.*
 
-### Skip prompts (default unanswered to "no")
+### Skip prompts (defaults any unanswered to "no")
 ```bash
-python threat_model_selector.py --no-prompt
+python tmhelper.py --no-prompt
 ```
+*For when your pipeline moves faster than your architecture review.*
 
 ---
 
 ## Level‑3 cheat sheet 🧠
 
 - **OCTAVE or FAIR**
-  - `l3_octavefair_quant`: need financial quant? → **FAIR**
-  - `l3_octavefair_orgwide`: org‑wide qualitative posture? → **OCTAVE**
+  - `l3_octavefair_quant`: need financial quant? → **FAIR** (bring charts)
+  - `l3_octavefair_orgwide`: org‑wide qualitative posture? → **OCTAVE** (bring workshops)
 - **VAST or Security Cards**
-  - `l3_vastcards_scale`: many teams / pipelines? → **VAST**
-  - `l3_vastcards_ideation`: creative workshop ideation? → **Security Cards**
+  - `l3_vastcards_scale`: many teams / pipelines? → **VAST** (DevSecOps catnip)
+  - `l3_vastcards_ideation`: creative workshop ideation? → **Security Cards** (post‑its sold separately)
 - **STRIDE**
-  - `l3_stride_dfd`: modeling DFDs/trust boundaries? → **STRIDE‑per‑DFD**
-  - `l3_stride_element`: service/component inventory? → **STRIDE‑per‑Element**
+  - `l3_stride_dfd`: modeling DFDs/trust boundaries? → **STRIDE‑per‑DFD** (draw boxes, save lives)
+  - `l3_stride_element`: service/component inventory? → **STRIDE‑per‑Element** (Kubernetes clusters *not* included)
 - **PASTA**
-  - `l3_pasta_full`: full 7‑stage traceability? → **PASTA (full)**
-  - `l3_pasta_light`: time‑boxed scenario variant? → **PASTA (light)**
+  - `l3_pasta_full`: full 7‑stage traceability? → **PASTA (full)** (fine dining)
+  - `l3_pasta_light`: time‑boxed scenario variant? → **PASTA (light)** (fast casual)
 - **Attack Trees + MITRE ATT&CK + CAPEC**
-  - `l3_amc_detection`: detection/blue‑team first? → **ATT&CK‑led mapping**
-  - `l3_amc_design`: architects/abuse‑case focus? → **Attack‑Tree‑led**
-  - `l3_amc_catalog`: reusable pattern catalogs? → **CAPEC‑led cataloging**
+  - `l3_amc_detection`: detection/blue‑team first? → **ATT&CK‑led mapping** (SOC‑approved)
+  - `l3_amc_design`: architects/abuse‑case focus? → **Attack‑Tree‑led** (whiteboard optional)
+  - `l3_amc_catalog`: reusable pattern catalogs? → **CAPEC‑led cataloging** (collect them all™)
 - **LINDDUN**
-  - `l3_linddun_dpia`: need DPIA/compliance artifact? → **LINDDUN (DPIA‑oriented)**
-  - `l3_linddun_engineering`: privacy engineering decisions? → **LINDDUN (engineering‑oriented)**
+  - `l3_linddun_dpia`: need DPIA/compliance artifact? → **LINDDUN (DPIA‑oriented)** (legal loves this one weird trick)
+  - `l3_linddun_engineering`: privacy engineering decisions? → **LINDDUN (engineering‑oriented)** (less paperwork, more patterns)
 
 ---
 
@@ -204,28 +213,36 @@ Also consider: STRIDE-per-DFD, FAIR, VAST
   ]
 }
 ```
+> `preference_scores` use the original Level‑1 labels for transparency. This is not a bug; it’s an *audit trail*. 🕵️‍♀️
 
-> Note: `preference_scores` are keyed by the **original Level‑1 labels** for transparency; human‑friendly names are resolved in `top_pick`, `also_consider`, and `recommendations`.
+---
+
+## Troubleshooting 🧯
+
+- **“python: command not found”** → try `python3`. If *that* fails, we respect your life choices and suggest a package manager.
+- **“unknown argument --json”** → the new flag is `--format json`.
+- **“why is my top pick the fallback?”** → you answered “no” to all L1 questions. Bold move. Try combining methods or revisiting scope.
 
 ---
 
 ## FAQ ❓💡
 
 **What if I answer everything with “no”?**  
-You’ve unlocked *Procrastinate‑Driven Development™*. The tool suggests revisiting scope or combining methods until something fits.
+You’ve unlocked *Procrastinate‑Driven Development™*. The tool suggests revisiting scope or combining methods until something fits. Also: hydrate.
 
 **What’s the “condensed recommendation”?**  
-The TL;DR: a **Top pick**, an **also consider** list, and any refinements to sprinkle on top. 🌶️
+The TL;DR: a **Top pick**, an **also consider** list, and refinements to sprinkle on top. 🌶️ Perfect for slides you present at 16:55 on a Friday.
 
 **Can I add my own frameworks or change weights?**  
-Yes. Extend `DETAILS`, `L3_BLOCKS`, and `resolve_l3()` as you like. (Framework weighting is on the roadmap; PRs welcome.)
+Yes. Extend `DETAILS`, `L3_BLOCKS`, and `resolve_l3()`. Weighting knobs are on the roadmap — right next to “make coffee.” ☕️ PRs welcome.
 
-**Why so many jokes?**  
-Because security is serious 🔐, but docs don’t have to be. 😂
+**Does this replace human threat modeling?**  
+No. It replaces **arguments** about which method to start with. Humans still required for diagrams, context, and snacks.
 
 ---
 
 ## License 📜🚀
 
 Released under the **Infinite Improbability License**. 🌌  
-Do whatever you like — if it goes wrong, blame the Vogons. 👽📚
+Do whatever you like — if it goes wrong, blame the Vogons. 👽📚  
+If it goes *right*, please pretend it was very difficult.
