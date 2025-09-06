@@ -12,39 +12,49 @@ Outputs:
 
 Usage:
   Interactive (default when stdin is a TTY and --no-prompt is not set):
-    python threat_model_selector.py
+    python tmhelper.py
 
   Non-interactive (lenient yes/no values):
-    python threat_model_selector.py \
+    python tmhelper.py \
       --q1 yes --q2 no --q3 yes --q4 no --q5 yes --q6 no \
       --q7 yes --q8 no --q9 yes --q10 yes --q11 yes --q12 no
 
   JSON output:
-    python threat_model_selector.py --format json
+    python tmhelper.py --format json
 
   Markdown output (great for wikis/PRs):
-    python threat_model_selector.py --format markdown
+    python tmhelper.py --format markdown
 
   Skip prompts (useful in CI; unanswered default to "no"):
-    python threat_model_selector.py --no-prompt
+    python tmhelper.py --no-prompt
 
   Only condensed:
-    python threat_model_selector.py --only-condensed
+    python tmhelper.py --only-condensed
 
   Provide answers from file (JSON or YAML):
-    python threat_model_selector.py --answers answers.json
+    python tmhelper.py --answers answers.json
+
+  Run the web UI:
+    python tmhelper.py --serve [--host 127.0.0.1] [--port 5000] [--debug]
 
 Notes:
 - CLI answers accept: y/n/yes/no/true/false/1/0 (case-insensitive).
 - Level 1 picks the main modeling approaches; Level 2 adds focused refinements.
 - Level 3 refines ambiguous Level-1 bundles (e.g., OCTAVE vs FAIR; VAST vs Security Cards).
 - "Top pick" is chosen from Level 1 selections; Level 2 provides tie-break boosts; Level 3 resolves names.
+
+Credits:
+- Core CLI/decision engine: Gideon Martijn
+- Web UI version: Martin Pearson
 """
 
 import argparse
 import json
 import sys
 from typing import Dict, List, Tuple, Any
+
+# Flask is optional and only used when --serve is provided
+from flask import Flask, render_template_string, request
 
 Question = Tuple[str, str, str]  # (id, text, rationale)
 
@@ -147,8 +157,6 @@ DETAILS: Dict[str, str] = {
 # -------------------------
 # Level 3: Method-specific refiners
 # -------------------------
-# Only asked if the corresponding Level-1 method is selected.
-# Keys must match Level-1 method labels.
 L3_BLOCKS: Dict[str, List[Question]] = {
     "OCTAVE or FAIR": [
         ("l3_octavefair_quant", "Do you need defensible financial quantification for board/budget decisions?",
@@ -246,7 +254,7 @@ def resolve_l3(method: str, answers: Dict[str, str]) -> str:
         q_det = answers.get("l3_amc_detection") == "yes"
         q_des = answers.get("l3_amc_design") == "yes"
         q_cat = answers.get("l3_amc_catalog") == "yes"
-        # Priority: detection > design > catalog (can tweak)
+        # Priority: detection > design > catalog
         if q_det and not (q_des or q_cat):
             return "ATT&CK-led mapping"
         if q_des and not (q_det or q_cat):
@@ -364,7 +372,6 @@ def _compute_preference_scores(answers: Dict[str, str], l1_selected: List[str]) 
     Score only Level-1 (primary) methods. Base points for each 'yes' pick,
     plus small bonuses from Level-2 answers as tie-breakers.
     """
-    # Base score for being selected at all
     BASE = 3
     BONUS = 1
 
@@ -381,8 +388,6 @@ def _compute_preference_scores(answers: Dict[str, str], l1_selected: List[str]) 
     if "STRIDE" in scores:
         if answers.get("q9") == "yes":  # CI/CD + cloud
             scores["STRIDE"] += BONUS
-        if answers.get("q7") == "yes":
-            scores["STRIDE"] += 0  # neutral but kept for readability
 
     if "LINDDUN" in scores:
         if answers.get("q7") == "yes":
@@ -461,8 +466,35 @@ def main() -> None:
         action="store_true",
         help="Do not prompt; default unanswered questions to 'no' (useful in CI)"
     )
+    # --- Serve the web UI instead of CLI ---
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Run the Flask web UI instead of the CLI."
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host interface for --serve (default: 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5000,
+        help="Port for --serve (default: 5000)"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable Flask debug mode (development only)."
+    )
 
     args = parser.parse_args()
+
+    # If serving, run the web app and exit
+    if args.serve:
+        app.run(host=args.host, port=args.port, debug=args.debug)
+        return
 
     answers: Dict[str, str] = {}
     interactive_ok = sys.stdin.isatty() and not args.no_prompt
@@ -495,7 +527,7 @@ def main() -> None:
                 if nv in {"yes", "no"}:
                     answers[qid] = nv
         # Optional L3 keys from file
-        for method, block in L3_BLOCKS.items():
+        for _method, block in L3_BLOCKS.items():
             for qid, _t, _w in block:
                 v = data.get(qid)
                 if isinstance(v, str):
@@ -538,7 +570,7 @@ def main() -> None:
 
     result = decide(answers)
 
-    # Post-process: resolve ambiguous L1 labels for display (recommendations/top pick/also_consider)
+    # Post-process: resolve ambiguous L1 labels for display
     def _resolved_name(name: str) -> str:
         return resolve_l3(name, result["answers"])
 
@@ -554,6 +586,10 @@ def main() -> None:
     result_out["schema_version"] = "1.0"
 
     # ---------- Output helpers ----------
+    def _sorted_by_score_local(scores: Dict[str, int]) -> List[str]:
+        return sorted(scores.keys(),
+                      key=lambda m: (-scores[m], PRIMARY_METHODS.index(m)))
+
     def _print_text(res: Dict[str, Any]) -> None:
         if args.only_condensed:
             print("=== Condensed Recommendation ===")
@@ -570,7 +606,7 @@ def main() -> None:
             print("Refinements: " + ", ".join(refinements))
 
         if res["preference_scores"]:
-            pairs = [f"{m}={res['preference_scores'][m]}" for m in _sorted_by_score(res["preference_scores"]) ]
+            pairs = [f"{m}={res['preference_scores'][m]}" for m in _sorted_by_score_local(res["preference_scores"]) ]
             print("Scores: " + ", ".join(pairs))
 
         print("\n=== Full Recommendation ===")
@@ -590,7 +626,7 @@ def main() -> None:
         if any_l3:
             print("  -- L3 refiners --")
             for method, block in L3_BLOCKS.items():
-                for qid, text, _w in block:
+                for qid, _text, _w in block:
                     if qid in res["answers"]:
                         print(f"  {qid}: {res['answers'][qid]}")
 
@@ -610,7 +646,7 @@ def main() -> None:
         if res["top_pick"] == "Reconsider scope / combine methods" and not [k for k, v in res["preference_scores"].items() if v > 0]:
             print("  - _No strong Level-1 fit; consider refining scope or combining methods._")
         if res["preference_scores"]:
-            ordered = _sorted_by_score(res["preference_scores"]) 
+            ordered = _sorted_by_score_local(res["preference_scores"]) 
             line = ", ".join([f"{m}={res['preference_scores'][m]}" for m in ordered])
             print(f"\n**Scores:** {line}\n")
         print("## Full Recommendation")
@@ -640,8 +676,131 @@ def main() -> None:
         _print_text(result_out)
 
 
+app = Flask(__name__)
+
+HTML_FORM = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Threat Model Selector</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .question { margin-bottom: 1em; }
+        .rationale { color: #555; font-size: 0.95em; }
+        .refinements { margin-top: 2em; }
+        .execute-btn { margin-top: 2em; }
+        .result { margin-top: 2em; background: #f9f9f9; padding: 1em; border-radius: 8px; }
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <h1>Threat Model Selector</h1>
+    <form method="post">
+        <h2>Level 1 Questions</h2>
+        {% for qid, text, rationale in questions_l1 %}
+            <div class="question">
+                <input type="checkbox" name="{{ qid }}" id="{{ qid }}" {% if answers.get(qid) == "yes" %}checked{% endif %}>
+                <label for="{{ qid }}"><strong>{{ text }}</strong></label>
+                <div class="rationale">{{ rationale }}</div>
+            </div>
+        {% endfor %}
+        <h2>Level 2 Refinements</h2>
+        {% for qid, text, rationale in questions_l2 %}
+            <div class="question">
+                <input type="checkbox" name="{{ qid }}" id="{{ qid }}" {% if answers.get(qid) == "yes" %}checked{% endif %}>
+                <label for="{{ qid }}"><strong>{{ text }}</strong></label>
+                <div class="rationale">{{ rationale }}</div>
+            </div>
+        {% endfor %}
+        {% if l3_blocks %}
+            <h2>Level 3 Method-Specific Refiners</h2>
+            {% for method, block in l3_blocks.items() %}
+                <h3>{{ method }}</h3>
+                {% for qid, text, rationale in block %}
+                    <div class="question">
+                        <input type="checkbox" name="{{ qid }}" id="{{ qid }}" {% if answers.get(qid) == "yes" %}checked{% endif %}>
+                        <label for="{{ qid }}"><strong>{{ text }}</strong></label>
+                        <div class="rationale">{{ rationale }}</div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        {% endif %}
+        <button class="execute-btn" type="submit">Get recommendation</button>
+    </form>
+    {% if result %}
+        <div class="result">
+            <h2>Condensed Recommendation</h2>
+            <strong>Top pick:</strong> {{ result.top_pick }}<br>
+            {% if result.also_consider %}
+                <strong>Also consider:</strong> {{ result.also_consider|join(', ') }}<br>
+            {% endif %}
+            <h2>Full Recommendation</h2>
+            <ul>
+            {% for rec, detail in zip(result.recommendations, result.details) %}
+                <li><strong>{{ rec }}</strong>: {{ detail }}</li>
+            {% endfor %}
+            </ul>
+            <h2>Rationale</h2>
+            <ul>
+            {% for r in result.rationale %}
+                <li>{{ r }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+</body>
+</html>
+"""
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    answers: Dict[str, str] = {}
+    result: Dict[str, Any] = None
+    l3_blocks: Dict[str, List[Question]] = {}
+
+    if request.method == "POST":
+        # Get answers from checkboxes
+        for qid, _text, _why in QUESTIONS_L1 + QUESTIONS_L2:
+            answers[qid] = "yes" if request.form.get(qid) else "no"
+        # Determine which L1 methods were selected
+        provisional_l1: List[str] = []
+        for (qid, _text, _why) in QUESTIONS_L1:
+            if answers.get(qid) == "yes":
+                rec = RECOMMENDATIONS_L1[qid]["yes"]
+                if rec not in provisional_l1:
+                    provisional_l1.append(rec)
+        # Show only relevant L3 blocks
+        for method in provisional_l1:
+            block = L3_BLOCKS.get(method, [])
+            if block:
+                l3_blocks[method] = block
+                for qid, _text, _why in block:
+                    answers[qid] = "yes" if request.form.get(qid) else "no"
+
+        result = decide(answers)
+        # Resolve ambiguous names for display
+        def _resolved_name(name: str) -> str:
+            return resolve_l3(name, result["answers"])
+        result["recommendations"] = [_resolved_name(r) for r in result["recommendations"]]
+        result["top_pick"] = _resolved_name(result["top_pick"])
+        result["also_consider"] = [_resolved_name(a) for a in result["also_consider"]]
+        result["details"] = [DETAILS.get(r, "") for r in result["recommendations"]]
+
+    else:
+        # GET: show all L1/L2, no answers checked
+        for qid, _text, _why in QUESTIONS_L1 + QUESTIONS_L2:
+            answers[qid] = "no"
+
+    return render_template_string(
+        HTML_FORM,
+        questions_l1=QUESTIONS_L1,
+        questions_l2=QUESTIONS_L2,
+        l3_blocks=l3_blocks,
+        answers=answers,
+        result=result,
+        zip=zip
+    )
+
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        sys.exit(1)
+    # Default to CLI. Use --serve to run the web UI.
+    main()
