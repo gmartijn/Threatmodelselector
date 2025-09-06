@@ -253,6 +253,7 @@ Knock, knock.
 
 Tortellini.
 — Tortellini who?
+
 Tortellini your devs about PASTA, or they’ll ship with meatball-sized attack surfaces.
 
 *P.S. If your auditor just became your Security Officer, don’t panic — it’s the same checklist, now with threat models and better jokes.* 😄
