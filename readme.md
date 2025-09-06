@@ -248,4 +248,10 @@ Released under the **Infinite Improbability License**. 🌌
 Do whatever you like — if it goes wrong, blame the Vogons. 👽📚  
 If it goes *right*, please pretend it was very difficult.
 
+Knock, knock.
+— Who’s there?
+Tortellini.
+— Tortellini who?
+Tortellini your devs about PASTA, or they’ll ship with meatball-sized attack surfaces.
+
 *P.S. If your auditor just became your Security Officer, don’t panic — it’s the same checklist, now with threat models and better jokes.* 😄
